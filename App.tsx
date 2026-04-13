@@ -3,6 +3,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StyleSheet, Text, View } from 'react-native';
 import SplashScreen from './src/screens/SplashScreen';
+import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
+import SavingLocationScreen from './src/screens/SavingLocationScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen';
+import MainScreen from './src/screens/MainScreen';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -19,7 +23,9 @@ const PlaceholderScreen = ({ route }: { route: { name: string } }) => {
   return (
     <View style={styles.placeholderContainer}>
       <Text style={styles.placeholderTitle}>{route.name}</Text>
-      <Text style={styles.placeholderSubtitle}>Screen structure added. Implementation pending.</Text>
+      <Text style={styles.placeholderSubtitle}>
+        Screen structure added. Implementation pending.
+      </Text>
     </View>
   );
 };
@@ -35,10 +41,10 @@ export default function App() {
         }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} />
-        <Stack.Screen name="LocationPermission" component={PlaceholderScreen} />
-        <Stack.Screen name="SavingLocation" component={PlaceholderScreen} />
-        <Stack.Screen name="Welcome" component={PlaceholderScreen} />
-        <Stack.Screen name="Main" component={PlaceholderScreen} />
+        <Stack.Screen name="LocationPermission" component={LocationPermissionScreen} />
+        <Stack.Screen name="SavingLocation" component={SavingLocationScreen} />
+        <Stack.Screen name="Welcome" component={WelcomeScreen} />
+        <Stack.Screen name="Main" component={MainScreen} />
         <Stack.Screen name="ScanMenu" component={PlaceholderScreen} />
       </Stack.Navigator>
       <StatusBar style="dark" backgroundColor="#C8E6FA" />
@@ -66,4 +72,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
