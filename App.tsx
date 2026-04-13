@@ -1,0 +1,69 @@
+import { StatusBar } from 'expo-status-bar';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { StyleSheet, Text, View } from 'react-native';
+import SplashScreen from './src/screens/SplashScreen';
+
+type RootStackParamList = {
+  Splash: undefined;
+  LocationPermission: undefined;
+  SavingLocation: undefined;
+  Welcome: undefined;
+  Main: undefined;
+  ScanMenu: undefined;
+};
+
+const Stack = createStackNavigator<RootStackParamList>();
+
+const PlaceholderScreen = ({ route }: { route: { name: string } }) => {
+  return (
+    <View style={styles.placeholderContainer}>
+      <Text style={styles.placeholderTitle}>{route.name}</Text>
+      <Text style={styles.placeholderSubtitle}>Screen structure added. Implementation pending.</Text>
+    </View>
+  );
+};
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Splash"
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: '#C8E6FA' },
+        }}
+      >
+        <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="LocationPermission" component={PlaceholderScreen} />
+        <Stack.Screen name="SavingLocation" component={PlaceholderScreen} />
+        <Stack.Screen name="Welcome" component={PlaceholderScreen} />
+        <Stack.Screen name="Main" component={PlaceholderScreen} />
+        <Stack.Screen name="ScanMenu" component={PlaceholderScreen} />
+      </Stack.Navigator>
+      <StatusBar style="dark" backgroundColor="#C8E6FA" />
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  placeholderContainer: {
+    flex: 1,
+    backgroundColor: '#C8E6FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  placeholderTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1A5276',
+    marginBottom: 10,
+  },
+  placeholderSubtitle: {
+    fontSize: 14,
+    color: '#2E86C1',
+    textAlign: 'center',
+  },
+});
+

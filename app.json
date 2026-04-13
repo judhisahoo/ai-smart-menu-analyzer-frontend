@@ -20,10 +20,20 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.judhisahoo.aismartmenuanalyzer"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d40e3768-a4e2-48b8-98c8-f5b884005ebc"
+      }
     }
   }
 }
