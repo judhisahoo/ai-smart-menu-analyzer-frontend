@@ -11,7 +11,6 @@ import {
   Dimensions,
   ScrollView,
   Platform,
-  FlatList,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -304,7 +303,11 @@ const ScanMenuScreen = ({ navigation }: any) => {
       return <ActivityIndicator style={{ marginVertical: 12 }} color="#2C6CB0" />;
     }
     if (visibleDishes.length > 0 && visibleDishes.length < dishes.length) {
-      return <Text style={styles.loadMoreText}>Scroll to load more dishes...</Text>;
+      return (
+        <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMoreDishes} activeOpacity={0.85}>
+          <Text style={styles.loadMoreBtnText}>Load more dishes</Text>
+        </TouchableOpacity>
+      );
     }
     return null;
   };
@@ -337,7 +340,7 @@ const ScanMenuScreen = ({ navigation }: any) => {
             ]}
           >
             <View style={styles.successIconCircle}>
-              <Ionicons name="checkmark-circle" size={64} color="#27AE60" />
+              <Ionicons name="checkmark-circle" size={48} color="#27AE60" />
             </View>
             <Text style={styles.successTitle}>Menu Scanned Successfully! ✅</Text>
             <Text style={styles.successSubtitle}>
@@ -472,17 +475,17 @@ const ScanMenuScreen = ({ navigation }: any) => {
         {scanState === 'success' && dishes.length > 0 && (
           <View style={styles.resultsCard}>
             <Text style={styles.resultsTitle}>Dish Results ({dishes.length})</Text>
-            <FlatList
-              data={visibleDishes}
-              renderItem={renderDishItem}
-              keyExtractor={(_, index) => String(index)}
-              onEndReached={loadMoreDishes}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={listFooter}
-              nestedScrollEnabled
-              scrollEnabled
+            <ScrollView
               style={styles.resultsList}
-            />
+              contentContainerStyle={styles.resultsListContent}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+            >
+              {visibleDishes.map((dish, index) => (
+                <View key={index}>{renderDishItem({ item: dish })}</View>
+              ))}
+              {listFooter()}
+            </ScrollView>
           </View>
         )}
       </ScrollView>
@@ -546,7 +549,7 @@ const styles = StyleSheet.create({
 
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 48,
+    paddingBottom: 32,
     alignItems: 'center',
   },
 
@@ -741,18 +744,18 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.82)',
     borderRadius: 24,
-    padding: 28,
+    padding: 20,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
     shadowColor: '#27AE60',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 8,
   },
   successIconCircle: {
-    width: 100,
-    height: 100,
+    width: 75,
+    height: 75,
     borderRadius: 50,
     backgroundColor: 'rgba(39,174,96,0.1)',
     justifyContent: 'center',
@@ -760,7 +763,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   successTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1A5276',
     textAlign: 'center',
@@ -831,8 +834,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#2C6CB0',
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 28,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
     shadowColor: '#2C6CB0',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
@@ -862,6 +865,9 @@ const styles = StyleSheet.create({
   resultsList: {
     width: '100%',
     maxHeight: 520,
+  },
+  resultsListContent: {
+    paddingBottom: 16,
   },
   dishCard: {
     flexDirection: 'row',
@@ -949,6 +955,24 @@ const styles = StyleSheet.create({
     color: '#2E86C1',
     marginVertical: 10,
     fontSize: 12,
+  },
+  loadMoreBtn: {
+    alignSelf: 'center',
+    marginTop: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: '#2C6CB0',
+    shadowColor: '#2C6CB0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loadMoreBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 
   debugCard: {

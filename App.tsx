@@ -8,6 +8,7 @@ import SavingLocationScreen from './src/screens/SavingLocationScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import MainScreen from './src/screens/MainScreen';
 import ScanMenuScreen from './src/screens/ScanMenuScreen';
+import UnderdevelopScreen from './src/screens/UnderdevelopScreen';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -16,6 +17,7 @@ type RootStackParamList = {
   Welcome: undefined;
   Main: undefined;
   ScanMenu: undefined;
+  Underdevelop: { screenName: string };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -36,6 +38,7 @@ export default function App() {
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Main" component={MainScreen} />
         <Stack.Screen name="ScanMenu" component={ScanMenuScreen} />
+        <Stack.Screen name="Underdevelop" component={UnderdevelopScreen} />
       </Stack.Navigator>
       <StatusBar style="dark" backgroundColor="#C8E6FA" />
     </NavigationContainer>

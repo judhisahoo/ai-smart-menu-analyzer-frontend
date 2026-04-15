@@ -81,9 +81,9 @@ const MainScreen = ({ navigation }: any) => {
 
   const menuItems = [
     { icon: 'camera-outline', label: 'Scan Menu', color: '#2C6CB0', route: 'ScanMenu' },
-    { icon: 'search-outline', label: 'Search Dishes', color: '#27AE60', route: null },
-    { icon: 'heart-outline', label: 'Favourites', color: '#E74C3C', route: null },
-    { icon: 'time-outline', label: 'History', color: '#E67E22', route: null },
+    { icon: 'time-outline', label: 'History', color: '#E67E22', route: 'Underdevelop' },
+    { icon: 'search-outline', label: 'Search Dishes', color: '#27AE60', route: 'Underdevelop' },
+    { icon: 'heart-outline', label: 'Favorites', color: '#E74C3C', route: 'Underdevelop' },    
   ];
 
   return (
@@ -135,7 +135,7 @@ const MainScreen = ({ navigation }: any) => {
               activeOpacity={0.8}
               onPress={() =>
                 item.route
-                  ? navigation.navigate(item.route)
+                  ? navigation.navigate(item.route, { screenName: item.label })
                   : Alert.alert('Coming Soon', `${item.label} will be available soon!`)
               }
             >
