@@ -7,6 +7,7 @@ import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
 import SavingLocationScreen from './src/screens/SavingLocationScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import MainScreen from './src/screens/MainScreen';
+import ScanMenuScreen from './src/screens/ScanMenuScreen';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -18,17 +19,6 @@ type RootStackParamList = {
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
-
-const PlaceholderScreen = ({ route }: { route: { name: string } }) => {
-  return (
-    <View style={styles.placeholderContainer}>
-      <Text style={styles.placeholderTitle}>{route.name}</Text>
-      <Text style={styles.placeholderSubtitle}>
-        Screen structure added. Implementation pending.
-      </Text>
-    </View>
-  );
-};
 
 export default function App() {
   return (
@@ -45,7 +35,7 @@ export default function App() {
         <Stack.Screen name="SavingLocation" component={SavingLocationScreen} />
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Main" component={MainScreen} />
-        <Stack.Screen name="ScanMenu" component={PlaceholderScreen} />
+        <Stack.Screen name="ScanMenu" component={ScanMenuScreen} />
       </Stack.Navigator>
       <StatusBar style="dark" backgroundColor="#C8E6FA" />
     </NavigationContainer>
