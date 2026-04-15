@@ -266,18 +266,32 @@ const ScanMenuScreen = ({ navigation }: any) => {
     setScanState('idle');
     setErrorMsg('');
     setScanResult(null);
+    setDishes([]);
+    setVisibleDishes([]);
   };
 
   const renderDishItem = ({ item }: { item: DishItem }) => (
     <View style={styles.dishCard}>
-      {item.image ? (
-        <Image source={{ uri: item.image }} style={styles.dishImage} resizeMode="cover" />
-      ) : (
-        <View style={styles.dishPlaceholder}>
-          <Ionicons name="image-outline" size={36} color="#5D6D7E" />
-          <Text style={styles.placeholderText}>No image</Text>
+      <View style={styles.dishImageColumn}>
+        {item.image ? (
+          <Image source={{ uri: item.image }} style={styles.dishImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.dishPlaceholder}>
+            <Ionicons name="image-outline" size={36} color="#5D6D7E" />
+            <Text style={styles.placeholderText}>No image</Text>
+          </View>
+        )}
+
+        <View style={styles.dishActionColumn}>
+          <TouchableOpacity style={[styles.dishActionBtn, styles.dishActionBtnPrimary]} onPress={() => {}} activeOpacity={0.8}>
+            <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextPrimary]}>View Components</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.dishActionBtn, styles.dishActionBtnSecondary]} onPress={() => {}} activeOpacity={0.8}>
+            <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextSecondary]}>View Ingredients</Text>
+          </TouchableOpacity>
         </View>
-      )}
+      </View>
+
       <View style={styles.dishDetails}>
         <Text style={styles.dishName}>{item.name}</Text>
         <Text style={styles.dishDescription}>{item.short_description}</Text>
@@ -337,23 +351,7 @@ const ScanMenuScreen = ({ navigation }: any) => {
                   source={{ uri: scanResult.scan_photo }}
                   style={styles.successThumb}
                   resizeMode="cover"
-                />
-                <View style={styles.successMeta}>
-                  <Ionicons name="barcode-outline" size={14} color="#2E86C1" />
-                  <Text style={styles.successMetaText}>Scan ID: #{scanResult.id}</Text>
-                </View>
-                <View style={styles.successMeta}>
-                  <Ionicons name="time-outline" size={14} color="#2E86C1" />
-                  <Text style={styles.successMetaText}>
-                    {new Date(scanResult.captured_at).toLocaleString()}
-                  </Text>
-                </View>
-                <View style={styles.successUrlBox}>
-                  <Text style={styles.successUrlLabel}>Image URL:</Text>
-                  <Text style={styles.successUrl} numberOfLines={3}>
-                    {scanResult.scan_photo}
-                  </Text>
-                </View>
+                />                                
               </>
             ) : (
               imageUri && <Image source={{ uri: imageUri }} style={styles.successThumb} />
@@ -364,6 +362,8 @@ const ScanMenuScreen = ({ navigation }: any) => {
               <Text style={styles.scanAgainBtnText}>Scan Another Menu</Text>
             </TouchableOpacity>
           </Animated.View>
+
+          
         ) : (
           <>
             <View style={styles.scannerZone}>
@@ -465,17 +465,11 @@ const ScanMenuScreen = ({ navigation }: any) => {
                   <Text style={styles.tipText}>{tip}</Text>
                 </View>
               ))}
-            </View>
-
-            <View style={styles.debugCard}>
-              <Text style={styles.debugTitle}>🔍 AsyncStorage: "user" key</Text>
-              <Text style={styles.debugUserId}>Resolved user_id: "{userId || 'EMPTY'}"</Text>
-              <Text style={styles.debugJson}>{rawUser}</Text>
-            </View>
+            </View>           
           </>
         )}
 
-        {dishes.length > 0 && (
+        {scanState === 'success' && dishes.length > 0 && (
           <View style={styles.resultsCard}>
             <Text style={styles.resultsTitle}>Dish Results ({dishes.length})</Text>
             <FlatList
@@ -875,13 +869,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 14,
     marginBottom: 12,
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   dishImage: {
-    width: 100,
-    height: 100,
+    width: 110,
+    height: 110,
     borderRadius: 16,
-    marginRight: 12,
   },
   dishPlaceholder: {
     width: 100,
@@ -890,13 +883,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(44,108,176,0.12)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginBottom: 12,
   },
   placeholderText: {
     marginTop: 6,
     fontSize: 11,
     color: '#5D6D7E',
     textAlign: 'center',
+  },
+  dishImageColumn: {
+    width: 110,
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  dishActionColumn: {
+    width: '100%',
   },
   dishDetails: {
     flex: 1,
@@ -911,6 +912,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#2E86C1',
     lineHeight: 18,
+  },
+  dishActionBtn: {
+    width: '100%',
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2C6CB0',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 10,
+  },
+  dishActionBtnPrimary: {
+    backgroundColor: '#2C6CB0',
+  },
+  dishActionBtnSecondary: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(44,108,176,0.45)',
+  },
+  dishActionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dishActionBtnTextPrimary: {
+    color: '#fff',
+  },
+  dishActionBtnTextSecondary: {
+    color: '#2C6CB0',
   },
   loadMoreText: {
     textAlign: 'center',
