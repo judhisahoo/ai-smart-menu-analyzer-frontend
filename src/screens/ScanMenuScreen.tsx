@@ -45,6 +45,11 @@ const ScanMenuScreen = ({ navigation }: any) => {
   const [dishes, setDishes] = useState<DishItem[]>([]);
   const [visibleDishes, setVisibleDishes] = useState<DishItem[]>([]);
   const [isMoreLoading, setIsMoreLoading] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState<
+    | { type: 'component'; dishName: string }
+    | { type: 'ingredient'; dishName: string }
+    | null
+  >(null);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -265,38 +270,111 @@ const ScanMenuScreen = ({ navigation }: any) => {
     setScanState('idle');
     setErrorMsg('');
     setScanResult(null);
-    setDishes([]);
-    setVisibleDishes([]);
   };
 
-  const renderDishItem = ({ item }: { item: DishItem }) => (
+  const sanitizeDishName = (name: string) => {
+    return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  };
+
+  const handleViewComponent = async (dishName: string) => {
+    const sanitized = sanitizeDishName(dishName);
+    setLoadingDetail({ type: 'component', dishName });
+    try {
+      const res = await fetch(`${BASE_URL}/api/dish/item-component/${sanitized}`);
+      if (res.ok) {
+        const json = await res.json();
+        const resultData = json?.data ?? json;
+        if (resultData) {
+          navigation.navigate('ComponentScreen', { data: resultData });
+        } else {
+          Alert.alert('Error', 'No component data returned from server.');
+        }
+      } else {
+        const errText = await res.text();
+        Alert.alert('Error', errText || 'Failed to fetch component data');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoadingDetail(null);
+    }
+  };
+
+  const handleViewIngredients = async (dishName: string) => {
+    const sanitized = sanitizeDishName(dishName);
+    setLoadingDetail({ type: 'ingredient', dishName });
+    try {
+      const res = await fetch(`${BASE_URL}/api/dish/item-ingredient/${sanitized}`);
+      if (res.ok) {
+        const json = await res.json();
+        const resultData = json?.data ?? json;
+        if (resultData) {
+          navigation.navigate('IngredientScreen', { data: resultData });
+        } else {
+          Alert.alert('Error', 'No ingredient data returned from server.');
+        }
+      } else {
+        const errText = await res.text();
+        Alert.alert('Error', errText || 'Failed to fetch ingredient data');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setLoadingDetail(null);
+    }
+  };
+
+  const renderDishItem = ({ item }: { item: DishItem }) => {
+    const isLoadingComponentButton = loadingDetail?.type === 'component' && loadingDetail.dishName === item.name;
+    const isLoadingIngredientsButton = loadingDetail?.type === 'ingredient' && loadingDetail.dishName === item.name;
+    return (
     <View style={styles.dishCard}>
-      <View style={styles.dishImageColumn}>
-        {item.image ? (
-          <Image source={{ uri: item.image }} style={styles.dishImage} resizeMode="cover" />
-        ) : (
-          <View style={styles.dishPlaceholder}>
-            <Ionicons name="image-outline" size={36} color="#5D6D7E" />
-            <Text style={styles.placeholderText}>No image</Text>
-          </View>
-        )}
-
-        <View style={styles.dishActionColumn}>
-          <TouchableOpacity style={[styles.dishActionBtn, styles.dishActionBtnPrimary]} onPress={() => {}} activeOpacity={0.8}>
-            <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextPrimary]}>View Components</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.dishActionBtn, styles.dishActionBtnSecondary]} onPress={() => {}} activeOpacity={0.8}>
-            <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextSecondary]}>View Ingredients</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <View style={styles.dishDetails}>
         <Text style={styles.dishName}>{item.name}</Text>
         <Text style={styles.dishDescription}>{item.short_description}</Text>
+
+        <View style={styles.dishActionRow}>
+          <TouchableOpacity
+            style={[styles.dishActionBtn, styles.dishActionBtnPrimary, isLoadingComponentButton && { opacity: 0.8 }]}
+            onPress={() => handleViewComponent(item.name)}
+            activeOpacity={0.8}
+            disabled={loadingDetail !== null}
+          >
+            {isLoadingComponentButton ? (
+              <View style={styles.loadingContent}>
+                <ActivityIndicator size="small" color="#fff" style={styles.loadingSpinner} />
+                <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextPrimary]}>Please wait</Text>
+              </View>
+            ) : (
+              <>
+                <Ionicons name="layers" size={15} color="#fff" style={styles.dishActionIcon} />
+                <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextPrimary]}>View Component</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.dishActionBtn, styles.dishActionBtnSecondary, isLoadingIngredientsButton && { opacity: 0.8 }]}
+            onPress={() => handleViewIngredients(item.name)}
+            activeOpacity={0.8}
+            disabled={loadingDetail !== null}
+          >
+            {isLoadingIngredientsButton ? (
+              <View style={styles.loadingContent}>
+                <ActivityIndicator size="small" color="#2C6CB0" style={styles.loadingSpinner} />
+                <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextSecondary]}>Please wait</Text>
+              </View>
+            ) : (
+              <>
+                <Ionicons name="list" size={15} color="#2C6CB0" style={styles.dishActionIcon} />
+                <Text style={[styles.dishActionBtnText, styles.dishActionBtnTextSecondary]}>View Ingredients</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
+};
 
   const listFooter = () => {
     if (isMoreLoading) {
@@ -870,12 +948,10 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   dishCard: {
-    flexDirection: 'row',
     backgroundColor: 'rgba(232,243,255,0.82)',
     borderRadius: 18,
     padding: 14,
     marginBottom: 12,
-    alignItems: 'flex-start',
   },
   dishImage: {
     width: 110,
@@ -898,7 +974,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   dishImageColumn: {
-    width: 110,
+    width: 140,
     alignItems: 'center',
     marginRight: 12,
   },
@@ -906,10 +982,10 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   dishDetails: {
-    flex: 1,
+    width: '100%',
   },
   dishName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: '#1A5276',
     marginBottom: 6,
@@ -917,20 +993,26 @@ const styles = StyleSheet.create({
   dishDescription: {
     fontSize: 13,
     color: '#2E86C1',
-    lineHeight: 18,
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  dishActionRow: {
+    flexDirection: 'row',
+    gap: 10,
   },
   dishActionBtn: {
-    width: '100%',
+    flex: 1,
+    minHeight: 42,
     borderRadius: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
     shadowColor: '#2C6CB0',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 3,
-    marginBottom: 10,
   },
   dishActionBtnPrimary: {
     backgroundColor: '#2C6CB0',
@@ -941,8 +1023,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(44,108,176,0.45)',
   },
   dishActionBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  dishActionIcon: {
+    marginRight: 5,
+  },
+  loadingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingSpinner: {
+    marginRight: 8,
   },
   dishActionBtnTextPrimary: {
     color: '#fff',

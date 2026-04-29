@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,11 +29,11 @@ const WelcomeScreen = ({ navigation }: any) => {
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingSavedUser, setCheckingSavedUser] = useState(true);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
-  // Pre-fill email from AsyncStorage (saved on previous session)
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -50,8 +51,8 @@ const WelcomeScreen = ({ navigation }: any) => {
     const loadSavedUser = async () => {
       try {
         const userRaw = await AsyncStorage.getItem('user');
+
         if (userRaw) {
-          // 'user' key exists — returning user, skip the welcome flow
           const userObj = JSON.parse(userRaw);
           const storedUserId: string = userObj?.user_id ?? userObj?.id ?? '';
           const storedEmail: string = userObj?.email ?? '';
@@ -59,59 +60,76 @@ const WelcomeScreen = ({ navigation }: any) => {
           if (storedEmail) {
             setEmail(storedEmail);
           }
+
           if (storedUserId) {
             setUserId(storedUserId);
           }
 
-          // Update current location on the server (using last-known / placeholder coords)
+          const locationRaw = await AsyncStorage.getItem('userLocation');
+          const location = locationRaw ? JSON.parse(locationRaw) : null;
+
           try {
             await fetch(`${BASE_URL}/api/user/current-location`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 user_id: storedUserId,
-                latitude: 1234.45565,
-                longitude: 3455.567,
-                accuracy: 5.7,
+                latitude: location?.latitude ?? null,
+                longitude: location?.longitude ?? null,
+                accuracy: location?.accuracy ?? null,
               }),
             });
-          } catch (_) {
-            // Location update failure is non-blocking; continue navigation
+          } catch {
+            // Non-blocking.
           }
 
-          // Skip welcome / OTP flow — go directly to Dashboard
           navigation.replace('Main');
+          return;
         }
-      } catch (_) {
-        // If parsing fails, fall through and show the welcome form normally
+
+        const savedEmail = await AsyncStorage.getItem('deviceEmail');
+        if (savedEmail) {
+          setEmail(savedEmail);
+        }
+      } catch {
+        await AsyncStorage.removeItem('user');
+      } finally {
+        setCheckingSavedUser(false);
       }
     };
-    loadSavedUser();
-  }, []);
+
+    void loadSavedUser();
+  }, [fadeAnim, navigation, slideAnim]);
 
   const sendOtp = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter your full name.');
       return;
     }
+
     if (!email) {
       Alert.alert('Error', 'Please enter your email address');
       return;
     }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
+
     setLoading(true);
+
     const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
     console.log('Generated OTP (dev):', generatedOtp);
+    console.log('Sending OTP to URL :', `${BASE_URL}/api/user/send-otp`);
     try {
       const res = await fetch(`${BASE_URL}/api/user/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp: generatedOtp }),
       });
+
       if (res.ok) {
         const data = await res.json();
         console.log('OTP sent response:', data);
@@ -125,6 +143,7 @@ const WelcomeScreen = ({ navigation }: any) => {
         Alert.alert('Error', errText || 'Failed to send OTP');
       }
     } catch (err: any) {
+      console.log('Error sending OTP at try catch section');
       Alert.alert('Error', err.message);
     } finally {
       setLoading(false);
@@ -144,15 +163,15 @@ const WelcomeScreen = ({ navigation }: any) => {
       Alert.alert('Error', 'Please enter your full name before continuing.');
       return;
     }
+
     setLoading(true);
+
     try {
-      // 1. Device ID — Android uses getAndroidId(), iOS uses getIosIdForVendor()
       const deviceId =
         Platform.OS === 'android'
           ? (Application.getAndroidId() ?? 'unknown-android')
           : ((await Application.getIosIdForVendorAsync()) ?? 'unknown-ios');
 
-      // 2. Location saved by SavingLocationScreen
       const locationRaw = await AsyncStorage.getItem('userLocation');
       const location = locationRaw ? JSON.parse(locationRaw) : null;
 
@@ -172,11 +191,12 @@ const WelcomeScreen = ({ navigation }: any) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
       if (res.ok) {
         const user = await res.json();
         await AsyncStorage.setItem('user', JSON.stringify(user));
         await AsyncStorage.setItem('deviceEmail', email);
-        navigation.navigate('Main');
+        navigation.replace('Main');
       } else {
         Alert.alert('Error', 'Registration failed. Please try again.');
       }
@@ -189,7 +209,6 @@ const WelcomeScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.outerContainer}>
-      {/* Background blobs */}
       <View style={styles.bgBlob1} />
       <View style={styles.bgBlob2} />
 
@@ -208,159 +227,173 @@ const WelcomeScreen = ({ navigation }: any) => {
               { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}
           >
-            {/* Logo */}
             <View style={styles.logoArea}>
               <View style={styles.logoCircle}>
                 <Ionicons name="restaurant" size={36} color="#ffffff" />
               </View>
               <Text style={styles.appName}>Smart Menu Analyzer</Text>
-              <Text style={styles.appTagline}>Scan • Understand • Enjoy</Text>
+              <Text style={styles.appTagline}>Scan. Understand. Enjoy.</Text>
             </View>
 
-            {/* Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {isOtpVerified ? '✅ Email Verified' : "Welcome! Let's get started"}
-              </Text>
-              <Text style={styles.cardSubtitle}>
-                {isOtpVerified
-                  ? 'Your email is verified. Tap Register to continue.'
-                  : showOtpInput
-                  ? 'Enter the OTP sent to your email.'
-                  : 'Enter your name and email to get started.'}
-              </Text>
-
-              {/* Full Name Field — always visible from step 1 */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Full Name</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons
-                    name="person-outline"
-                    size={18}
-                    color="#2C6CB0"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Your full name"
-                    placeholderTextColor="#90BEE0"
-                    value={name}
-                    onChangeText={setName}
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                    returnKeyType="next"
-                    editable={!showOtpInput}
-                  />
-                  {name !== '' && !showOtpInput && (
-                    <TouchableOpacity onPress={() => setName('')}>
-                      <Ionicons name="close-circle" size={18} color="#90BEE0" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Email Field */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email Address</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons
-                    name="mail-outline"
-                    size={18}
-                    color="#2C6CB0"
-                    style={styles.inputIcon}
-                  />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="your@email.com"
-                    placeholderTextColor="#90BEE0"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    editable={!showOtpInput}
-                  />
-                  {email !== '' && !showOtpInput && (
-                    <TouchableOpacity onPress={() => setEmail('')}>
-                      <Ionicons name="close-circle" size={18} color="#90BEE0" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* OTP Field */}
-              {showOtpInput && !isOtpVerified && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Verification Code</Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons
-                      name="key-outline"
-                      size={18}
-                      color="#2C6CB0"
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="Enter 6-digit OTP"
-                      placeholderTextColor="#90BEE0"
-                      value={otp}
-                      onChangeText={setOtp}
-                      keyboardType="numeric"
-                      maxLength={6}
-                    />
+              {checkingSavedUser ? (
+                <>
+                  <Text style={styles.cardTitle}>Checking your account</Text>
+                  <View style={styles.loadingRow}>
+                    <ActivityIndicator size="small" color="#2C6CB0" />
+                    <Text style={styles.loadingText}>Please wait while we prepare your account.</Text>
                   </View>
-                </View>
-              )}
-
-
-
-              {/* Action Buttons */}
-              {!showOtpInput ? (
-                <TouchableOpacity
-                  style={[styles.primaryBtn, loading && styles.btnDisabled]}
-                  onPress={sendOtp}
-                  disabled={loading}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="send-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>
-                    {loading ? 'Sending...' : 'Send OTP'}
-                  </Text>
-                </TouchableOpacity>
-              ) : isOtpVerified ? (
-                <TouchableOpacity
-                  style={[styles.primaryBtn, styles.registerBtn, loading && styles.btnDisabled]}
-                  onPress={register}
-                  disabled={loading}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryBtnText}>
-                    {loading ? 'Registering...' : 'Register & Continue'}
-                  </Text>
-                </TouchableOpacity>
+                </>
               ) : (
-                <View style={styles.otpBtnRow}>
-                  <TouchableOpacity
-                    style={[styles.primaryBtn, styles.verifyBtn, { flex: 1 }]}
-                    onPress={verifyOtp}
-                    activeOpacity={0.85}
-                  >
-                    <Ionicons name="shield-checkmark-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-                    <Text style={styles.primaryBtnText}>Verify OTP</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.resendBtn}
-                    onPress={() => {
-                      setShowOtpInput(false);
-                      setOtp('');
-                      setSentOtp('');
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.resendBtnText}>Resend</Text>
-                  </TouchableOpacity>
-                </View>
+                <>
+                  <Text style={styles.cardTitle}>
+                    {isOtpVerified ? 'Email Verified' : "Welcome! Let's get started"}
+                  </Text>
+                  <Text style={styles.cardSubtitle}>
+                    {isOtpVerified
+                      ? 'Your email is verified. Tap Register to continue.'
+                      : showOtpInput
+                        ? 'Enter the OTP sent to your email.'
+                        : 'Enter your name and email to get started.'}
+                  </Text>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Full Name</Text>
+                    <View style={styles.inputWrapper}>
+                      <Ionicons
+                        name="person-outline"
+                        size={18}
+                        color="#2C6CB0"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Your full name"
+                        placeholderTextColor="#90BEE0"
+                        value={name}
+                        onChangeText={setName}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        returnKeyType="next"
+                        editable={!showOtpInput}
+                      />
+                      {name !== '' && !showOtpInput && (
+                        <TouchableOpacity onPress={() => setName('')}>
+                          <Ionicons name="close-circle" size={18} color="#90BEE0" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Email Address</Text>
+                    <View style={styles.inputWrapper}>
+                      <Ionicons
+                        name="mail-outline"
+                        size={18}
+                        color="#2C6CB0"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="your@email.com"
+                        placeholderTextColor="#90BEE0"
+                        value={email}
+                        onChangeText={setEmail}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        editable={!showOtpInput}
+                      />
+                      {email !== '' && !showOtpInput && (
+                        <TouchableOpacity onPress={() => setEmail('')}>
+                          <Ionicons name="close-circle" size={18} color="#90BEE0" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  {showOtpInput && !isOtpVerified && (
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>Verification Code</Text>
+                      <View style={styles.inputWrapper}>
+                        <Ionicons
+                          name="key-outline"
+                          size={18}
+                          color="#2C6CB0"
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="Enter 6-digit OTP"
+                          placeholderTextColor="#90BEE0"
+                          value={otp}
+                          onChangeText={setOtp}
+                          keyboardType="numeric"
+                          maxLength={6}
+                        />
+                      </View>
+                    </View>
+                  )}
+
+                  {!showOtpInput ? (
+                    <TouchableOpacity
+                      style={[styles.primaryBtn, loading && styles.btnDisabled]}
+                      onPress={sendOtp}
+                      disabled={loading}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons name="send-outline" size={18} color="#fff" style={styles.buttonIcon} />
+                      <Text style={styles.primaryBtnText}>
+                        {loading ? 'Sending...' : 'Send OTP'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : isOtpVerified ? (
+                    <TouchableOpacity
+                      style={[styles.primaryBtn, styles.registerBtn, loading && styles.btnDisabled]}
+                      onPress={register}
+                      disabled={loading}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={18}
+                        color="#fff"
+                        style={styles.buttonIcon}
+                      />
+                      <Text style={styles.primaryBtnText}>
+                        {loading ? 'Registering...' : 'Register & Continue'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.otpBtnRow}>
+                      <TouchableOpacity
+                        style={[styles.primaryBtn, styles.verifyBtn, styles.flexButton]}
+                        onPress={verifyOtp}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons
+                          name="shield-checkmark-outline"
+                          size={18}
+                          color="#fff"
+                          style={styles.buttonIcon}
+                        />
+                        <Text style={styles.primaryBtnText}>Verify OTP</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.resendBtn}
+                        onPress={() => {
+                          setShowOtpInput(false);
+                          setOtp('');
+                          setSentOtp('');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.resendBtnText}>Resend</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </>
               )}
             </View>
 
@@ -377,7 +410,11 @@ const WelcomeScreen = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  outerContainer: { flex: 1, backgroundColor: '#C8E6FA', overflow: 'hidden' },
+  outerContainer: {
+    flex: 1,
+    backgroundColor: '#C8E6FA',
+    overflow: 'hidden',
+  },
   bgBlob1: {
     position: 'absolute',
     width: width * 0.9,
@@ -396,17 +433,22 @@ const styles = StyleSheet.create({
     bottom: -width * 0.2,
     left: -width * 0.2,
   },
-  kvContainer: { flex: 1 },
+  kvContainer: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 20,
     paddingVertical: 40,
   },
-  inner: { alignItems: 'center' },
-
-  // Logo
-  logoArea: { alignItems: 'center', marginBottom: 28 },
+  inner: {
+    alignItems: 'center',
+  },
+  logoArea: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
   logoCircle: {
     width: 72,
     height: 72,
@@ -421,10 +463,19 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 10,
   },
-  appName: { fontSize: 22, fontWeight: '800', color: '#1A5276', textAlign: 'center' },
-  appTagline: { fontSize: 13, color: '#2E86C1', fontStyle: 'italic', marginTop: 4, letterSpacing: 0.8 },
-
-  // Card
+  appName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1A5276',
+    textAlign: 'center',
+  },
+  appTagline: {
+    fontSize: 13,
+    color: '#2E86C1',
+    fontStyle: 'italic',
+    marginTop: 4,
+    letterSpacing: 0.8,
+  },
   card: {
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.78)',
@@ -437,11 +488,33 @@ const styles = StyleSheet.create({
     elevation: 10,
     marginBottom: 20,
   },
-  cardTitle: { fontSize: 18, fontWeight: '800', color: '#1A5276', marginBottom: 4 },
-  cardSubtitle: { fontSize: 13, color: '#2E86C1', marginBottom: 20, lineHeight: 18 },
-
-  // Inputs
-  inputGroup: { marginBottom: 16 },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1A5276',
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: '#2E86C1',
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  loadingRow: {
+    marginTop: 8,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#2E86C1',
+    marginLeft: 10,
+    lineHeight: 18,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
   label: {
     fontSize: 12,
     fontWeight: '700',
@@ -460,15 +533,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 2,
   },
-  inputIcon: { marginRight: 8 },
+  inputIcon: {
+    marginRight: 8,
+  },
   textInput: {
     flex: 1,
     fontSize: 15,
     color: '#1A5276',
     paddingVertical: 12,
   },
-
-  // Buttons
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -483,12 +556,33 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  registerBtn: { backgroundColor: '#1A5276' },
-  verifyBtn: { backgroundColor: '#27AE60' },
-  btnDisabled: { opacity: 0.6 },
-  primaryBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
-
-  otpBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  registerBtn: {
+    backgroundColor: '#1A5276',
+  },
+  verifyBtn: {
+    backgroundColor: '#27AE60',
+  },
+  flexButton: {
+    flex: 1,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  buttonIcon: {
+    marginRight: 8,
+  },
+  primaryBtnText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  otpBtnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
   resendBtn: {
     paddingVertical: 14,
     paddingHorizontal: 16,
@@ -496,11 +590,22 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#2C6CB0',
   },
-  resendBtnText: { color: '#2C6CB0', fontWeight: '700', fontSize: 14 },
-
-  // Terms
-  termsText: { fontSize: 11, color: '#2E86C1', textAlign: 'center', lineHeight: 16 },
-  termsLink: { color: '#1A5276', fontWeight: '700', textDecorationLine: 'underline' },
+  resendBtnText: {
+    color: '#2C6CB0',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  termsText: {
+    fontSize: 11,
+    color: '#2E86C1',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  termsLink: {
+    color: '#1A5276',
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  },
 });
 
 export default WelcomeScreen;

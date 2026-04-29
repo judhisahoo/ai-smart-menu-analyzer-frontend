@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,23 +6,50 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
-  Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 
 const LocationPermissionScreen = ({ navigation }: any) => {
   const [requesting, setRequesting] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
+  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [servicesEnabled, setServicesEnabled] = useState(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(40)).current;
 
+  const checkLocationState = useCallback(async () => {
+    setCheckingStatus(true);
+
+    try {
+      const [permission, enabled] = await Promise.all([
+        Location.getForegroundPermissionsAsync(),
+        Location.hasServicesEnabledAsync(),
+      ]);
+
+      const granted = permission.status === 'granted';
+      setPermissionGranted(granted);
+      setServicesEnabled(enabled);
+
+      if (granted && enabled) {
+        navigation.replace('SavingLocation');
+      }
+    } catch {
+      setPermissionGranted(false);
+      setServicesEnabled(false);
+    } finally {
+      setCheckingStatus(false);
+    }
+  }, [navigation]);
+
   useEffect(() => {
-    // Entry animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -36,7 +63,6 @@ const LocationPermissionScreen = ({ navigation }: any) => {
       }),
     ]).start();
 
-    // Pulse animation on location icon
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -51,50 +77,106 @@ const LocationPermissionScreen = ({ navigation }: any) => {
         }),
       ])
     );
+
     pulse.start();
     return () => pulse.stop();
-  }, []);
+  }, [fadeAnim, pulseAnim, slideAnim]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void checkLocationState();
+    }, [checkLocationState])
+  );
 
   const handleAllowLocation = async () => {
     setRequesting(true);
-    try {
-      const { status, canAskAgain } =
-        await Location.requestForegroundPermissionsAsync();
 
-      if (status === 'granted') {
-        // Permission granted — proceed
-        navigation.replace('SavingLocation');
-      } else if (!canAskAgain) {
-        // Permanently denied — must open Settings
-        Alert.alert(
-          'Location Required',
-          'Location permission was permanently denied. Please enable it in your device Settings to continue using this app.',
-          [
-            {
-              text: 'Open Settings',
-              onPress: () => Linking.openSettings(),
-            },
-          ],
-          { cancelable: false }
-        );
-      } else {
-        // Denied but can ask again — show message and let user retry
-        Alert.alert(
-          'Location Required',
-          'This app requires location access to provide personalized restaurant recommendations near you. Please allow location to continue.',
-          [{ text: 'Try Again', style: 'default' }]
-        );
+    try {
+      const currentPermission = await Location.getForegroundPermissionsAsync();
+      let permissionStatus = currentPermission.status;
+      let canAskAgain = currentPermission.canAskAgain;
+
+      if (permissionStatus !== 'granted') {
+        const requestedPermission = await Location.requestForegroundPermissionsAsync();
+        permissionStatus = requestedPermission.status;
+        canAskAgain = requestedPermission.canAskAgain;
       }
-    } catch (error) {
-      Alert.alert('Error', 'Could not request location permission. Please try again.');
+
+      if (permissionStatus !== 'granted') {
+        setPermissionGranted(false);
+        setServicesEnabled(false);
+
+        if (!canAskAgain) {
+          Alert.alert(
+            'Location Permission Required',
+            'Location permission is blocked right now. Please allow it on the next prompt and tap the button again.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+
+        Alert.alert(
+          'Location Permission Required',
+          'This app requires location permission to continue.',
+          [{ text: 'Try Again' }]
+        );
+        return;
+      }
+
+      setPermissionGranted(true);
+
+      let enabled = await Location.hasServicesEnabledAsync();
+
+      if (enabled) {
+        setServicesEnabled(true);
+        navigation.replace('SavingLocation');
+        return;
+      }
+
+      if (Platform.OS === 'android') {
+        try {
+          await Location.enableNetworkProviderAsync();
+          enabled = await Location.hasServicesEnabledAsync();
+        } catch {
+          // User dismissed system prompt.
+        }
+      }
+
+      setServicesEnabled(enabled);
+
+      if (enabled) {
+        navigation.replace('SavingLocation');
+        return;
+      }
+
+      Alert.alert(
+        'Turn On Location Service',
+        'Location service is still OFF. Turn it ON and tap the button again.',
+        [{ text: 'Try Again' }]
+      );
+    } catch {
+      Alert.alert('Error', 'Could not request location access. Please try again.');
     } finally {
       setRequesting(false);
     }
   };
 
+  const buttonLabel = checkingStatus
+    ? 'Checking location status...'
+    : permissionGranted && !servicesEnabled
+      ? 'Turn On Location Service'
+      : 'Allow Location Access';
+
+  const subtitleText = permissionGranted && !servicesEnabled
+    ? 'Location permission is granted. Please turn on device location service, then tap the button again.'
+    : 'Smart Menu Analyzer uses your location to show nearby restaurants and provide personalized menu recommendations.';
+
+  const mandatoryText = permissionGranted && !servicesEnabled
+    ? 'Device location service must stay ON to use this app.'
+    : 'Location access is mandatory to use this app.';
+
   return (
     <View style={styles.container}>
-      {/* Background decorative circles */}
       <View style={styles.bgCircle1} />
       <View style={styles.bgCircle2} />
 
@@ -104,7 +186,6 @@ const LocationPermissionScreen = ({ navigation }: any) => {
           { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
         ]}
       >
-        {/* Icon area */}
         <View style={styles.iconWrapper}>
           <View style={styles.iconRing2} />
           <View style={styles.iconRing1} />
@@ -115,12 +196,8 @@ const LocationPermissionScreen = ({ navigation }: any) => {
           </Animated.View>
         </View>
 
-        {/* Text */}
         <Text style={styles.title}>Location Access{'\n'}Required</Text>
-        <Text style={styles.subtitle}>
-          Smart Menu Analyzer uses your location to show nearby restaurants and
-          provide personalized menu recommendations.
-        </Text>
+        <Text style={styles.subtitle}>{subtitleText}</Text>
 
         <View style={styles.featureList}>
           {[
@@ -137,30 +214,27 @@ const LocationPermissionScreen = ({ navigation }: any) => {
           ))}
         </View>
 
-        {/* Mandatory note */}
         <View style={styles.mandatoryNote}>
           <Ionicons name="information-circle-outline" size={16} color="#E67E22" />
-          <Text style={styles.mandatoryText}>
-            Location access is mandatory to use this app.
-          </Text>
+          <Text style={styles.mandatoryText}>{mandatoryText}</Text>
         </View>
 
-        {/* Allow Button */}
         <TouchableOpacity
-          style={[styles.allowButton, requesting && styles.allowButtonDisabled]}
+          style={[
+            styles.allowButton,
+            (requesting || checkingStatus) && styles.allowButtonDisabled,
+          ]}
           onPress={handleAllowLocation}
-          disabled={requesting}
+          disabled={requesting || checkingStatus}
           activeOpacity={0.85}
         >
           <Ionicons name="location-outline" size={20} color="#fff" style={styles.btnIcon} />
           <Text style={styles.allowButtonText}>
-            {requesting ? 'Requesting...' : 'Allow Location Access'}
+            {requesting ? 'Working...' : buttonLabel}
           </Text>
         </TouchableOpacity>
 
-        <Text style={styles.footerNote}>
-          You cannot skip this step.
-        </Text>
+        <Text style={styles.footerNote}>You cannot skip this step.</Text>
       </Animated.View>
     </View>
   );
@@ -196,8 +270,6 @@ const styles = StyleSheet.create({
     width: '88%',
     alignItems: 'center',
   },
-
-  // Icon
   iconWrapper: {
     width: 130,
     height: 130,
@@ -232,8 +304,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 10,
   },
-
-  // Text
   title: {
     fontSize: 28,
     fontWeight: '800',
@@ -250,8 +320,6 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     paddingHorizontal: 8,
   },
-
-  // Feature list
   featureList: {
     width: '100%',
     backgroundColor: 'rgba(255,255,255,0.6)',
@@ -278,8 +346,6 @@ const styles = StyleSheet.create({
     color: '#1A5276',
     fontWeight: '500',
   },
-
-  // Mandatory note
   mandatoryNote: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,8 +362,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
   },
-
-  // Button
   allowButton: {
     flexDirection: 'row',
     alignItems: 'center',

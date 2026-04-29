@@ -9,6 +9,9 @@ import WelcomeScreen from './src/screens/WelcomeScreen';
 import MainScreen from './src/screens/MainScreen';
 import ScanMenuScreen from './src/screens/ScanMenuScreen';
 import UnderdevelopScreen from './src/screens/UnderdevelopScreen';
+import ComponentScreen from './src/screens/ComponentScreen';
+import IngredientScreen from './src/screens/IngredientScreen';
+import SearchDishScreen from './src/screens/SearchDishScreen';
 
 type RootStackParamList = {
   Splash: undefined;
@@ -17,6 +20,9 @@ type RootStackParamList = {
   Welcome: undefined;
   Main: undefined;
   ScanMenu: undefined;
+  SearchDish: undefined;
+  ComponentScreen: { data: any };
+  IngredientScreen: { data: any };
   Underdevelop: { screenName: string };
 };
 
@@ -38,6 +44,9 @@ export default function App() {
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Main" component={MainScreen} />
         <Stack.Screen name="ScanMenu" component={ScanMenuScreen} />
+        <Stack.Screen name="SearchDish" component={SearchDishScreen} />
+        <Stack.Screen name="ComponentScreen" component={ComponentScreen} />
+        <Stack.Screen name="IngredientScreen" component={IngredientScreen} />
         <Stack.Screen name="Underdevelop" component={UnderdevelopScreen} />
       </Stack.Navigator>
       <StatusBar style="dark" backgroundColor="#C8E6FA" />

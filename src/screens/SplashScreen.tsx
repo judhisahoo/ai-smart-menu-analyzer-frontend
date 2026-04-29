@@ -9,11 +9,13 @@ import {
   Dimensions,
 } from 'react-native';
 import type { StackNavigationProp } from '@react-navigation/stack';
+import * as Location from 'expo-location';
 
 const { width, height } = Dimensions.get('window');
 
 type RootStackParamList = {
   LocationPermission: undefined;
+  SavingLocation: undefined;
 };
 
 type SplashScreenProps = {
@@ -26,7 +28,6 @@ const SplashScreen = ({ navigation }: SplashScreenProps) => {
   const slideUpAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
-    // Entry animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -46,22 +47,48 @@ const SplashScreen = ({ navigation }: SplashScreenProps) => {
       }),
     ]).start();
 
-    // Navigate to LocationPermission after 3 seconds
-    const timer = setTimeout(() => {
-      navigation.replace('LocationPermission');
-    }, 3000);
+    let isActive = true;
 
-    return () => clearTimeout(timer);
-  }, []);
+    const checkStartupRoute = async () => {
+      try {
+        const [permission, servicesEnabled] = await Promise.all([
+          Location.getForegroundPermissionsAsync(),
+          Location.hasServicesEnabledAsync(),
+        ]);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (permission.status === 'granted' && servicesEnabled) {
+          navigation.replace('SavingLocation');
+          return;
+        }
+
+        navigation.replace('LocationPermission');
+      } catch {
+        if (isActive) {
+          navigation.replace('LocationPermission');
+        }
+      }
+    };
+
+    const timer = setTimeout(() => {
+      void checkStartupRoute();
+    }, 2500);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timer);
+    };
+  }, [fadeAnim, navigation, scaleAnim, slideUpAnim]);
 
   return (
     <View style={styles.container}>
-      {/* Decorative background circles */}
       <View style={styles.bgCircle1} />
       <View style={styles.bgCircle2} />
       <View style={styles.bgCircle3} />
 
-      {/* Top Section */}
       <Animated.View
         style={[
           styles.topContainer,
@@ -69,10 +96,9 @@ const SplashScreen = ({ navigation }: SplashScreenProps) => {
         ]}
       >
         <Text style={styles.title}>Smart Menu Analyzer</Text>
-        <Text style={styles.tagline}>Scan • Understand • Enjoy</Text>
+        <Text style={styles.tagline}>Scan. Understand. Enjoy.</Text>
       </Animated.View>
 
-      {/* Center Image */}
       <Animated.View
         style={[
           styles.imageContainer,
@@ -86,10 +112,7 @@ const SplashScreen = ({ navigation }: SplashScreenProps) => {
         />
       </Animated.View>
 
-      {/* Bottom Section */}
-      <Animated.View
-        style={[styles.bottomContainer, { opacity: fadeAnim }]}
-      >
+      <Animated.View style={[styles.bottomContainer, { opacity: fadeAnim }]}>
         <Text style={styles.loadingText}>Loading...</Text>
         <ActivityIndicator size="large" color="#4A90E2" style={styles.loader} />
         <Text style={styles.poweredText}>
@@ -109,8 +132,6 @@ const styles = StyleSheet.create({
     paddingVertical: 56,
     overflow: 'hidden',
   },
-
-  // Decorative background blobs
   bgCircle1: {
     position: 'absolute',
     width: width * 0.8,
@@ -138,8 +159,6 @@ const styles = StyleSheet.create({
     bottom: -width * 0.1,
     right: -width * 0.05,
   },
-
-  // Top section
   topContainer: {
     alignItems: 'center',
     zIndex: 1,
@@ -161,8 +180,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     letterSpacing: 1,
   },
-
-  // Center image
   imageContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -173,8 +190,6 @@ const styles = StyleSheet.create({
     width: width * 0.78,
     height: width * 0.78,
   },
-
-  // Bottom section
   bottomContainer: {
     alignItems: 'center',
     zIndex: 1,

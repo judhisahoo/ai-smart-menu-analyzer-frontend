@@ -82,7 +82,7 @@ const MainScreen = ({ navigation }: any) => {
   const menuItems = [
     { icon: 'camera-outline', label: 'Scan Menu', color: '#2C6CB0', route: 'ScanMenu' },
     { icon: 'time-outline', label: 'History', color: '#E67E22', route: 'Underdevelop' },
-    { icon: 'search-outline', label: 'Search Dishes', color: '#27AE60', route: 'Underdevelop' },
+    { icon: 'search-outline', label: 'Search Dishes', color: '#27AE60', route: 'SearchDish' },
     { icon: 'heart-outline', label: 'Favorites', color: '#E74C3C', route: 'Underdevelop' },    
   ];
 
