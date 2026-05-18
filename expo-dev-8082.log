@@ -2,3 +2,24 @@ Starting project at E:\MCA\semister-4\project\mobile-app\ai-smart-menu-analyzer
 Starting Metro Bundler
 Waiting on http://localhost:8082
 Logs for your project will appear below.
+E:\MCA\semister-4\project\mobile-app\ai-smart-menu-analyzer\node_modules\expo\node_modules\@expo\cli\build\src\utils\errors.js:130
+    throw error;
+    ^
+
+Error: ENOENT: no such file or directory, watch 'E:\MCA\semister-4\project\mobile-app\ai-smart-menu-analyzer\node_modules\.expo-dev-launcher-IOvr8lei\android\build\intermediates\java_res\debug\processDebugJavaRes\out\com\facebook\react\devsupport'
+    at FSWatcher.<computed> (node:internal/fs/watchers:247:19)
+    at Object.watch (node:fs:2491:36)
+    at FallbackWatcher._watchdir (E:\MCA\semister-4\project\mobile-app\ai-smart-menu-analyzer\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:119:33)
+    at E:\MCA\semister-4\project\mobile-app\ai-smart-menu-analyzer\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:219:22
+    at Walker.<anonymous> (E:\MCA\semister-4\project\mobile-app\ai-smart-menu-analyzer\node_modules\metro-file-map\src\watchers\FallbackWatcher.js:358:5)
+    at Walker.emit (node:events:524:28)
+    at E:\MCA\semister-4\project\mobile-app\ai-smart-menu-analyzer\node_modules\walker\lib\walker.js:69:16
+    at FSReqCallback.oncomplete (node:fs:188:23) {
+  errno: -4058,
+  syscall: 'watch',
+  code: 'ENOENT',
+  path: 'E:\\MCA\\semister-4\\project\\mobile-app\\ai-smart-menu-analyzer\\node_modules\\.expo-dev-launcher-IOvr8lei\\android\\build\\intermediates\\java_res\\debug\\processDebugJavaRes\\out\\com\\facebook\\react\\devsupport',
+  filename: 'E:\\MCA\\semister-4\\project\\mobile-app\\ai-smart-menu-analyzer\\node_modules\\.expo-dev-launcher-IOvr8lei\\android\\build\\intermediates\\java_res\\debug\\processDebugJavaRes\\out\\com\\facebook\\react\\devsupport'
+}
+
+Node.js v20.19.4

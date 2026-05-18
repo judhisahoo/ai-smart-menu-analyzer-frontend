@@ -20,6 +20,7 @@ import { BASE_URL } from '../constants';
 const { width } = Dimensions.get('window');
 const ITEMS_PER_PAGE = 10;
 const DISHES_STORAGE_KEY = 'scan_dishes_cache';
+const SCAN_MENU_DEBUG_VERSION = 'scan-upload-debug-v2';
 
 type ScanState = 'idle' | 'uploading' | 'success' | 'error';
 
@@ -35,12 +36,22 @@ type ScanResult = {
   captured_at: string;
 };
 
+type SelectedImageInfo = {
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+  width?: number;
+  height?: number;
+};
+
 const ScanMenuScreen = ({ navigation }: any) => {
   const [userId, setUserId] = useState<string>('');
   const [rawUser, setRawUser] = useState<string>('Not loaded yet...');
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageInfo, setImageInfo] = useState<SelectedImageInfo | null>(null);
   const [scanState, setScanState] = useState<ScanState>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
+  const [scanLogs, setScanLogs] = useState<string[]>([]);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [dishes, setDishes] = useState<DishItem[]>([]);
   const [visibleDishes, setVisibleDishes] = useState<DishItem[]>([]);
@@ -57,6 +68,8 @@ const ScanMenuScreen = ({ navigation }: any) => {
   const successAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    console.log(`[ScanMenu] screen mounted - ${SCAN_MENU_DEBUG_VERSION}`, { baseUrl: BASE_URL });
+
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
@@ -145,43 +158,137 @@ const ScanMenuScreen = ({ navigation }: any) => {
     setTimeout(() => setIsMoreLoading(false), 250);
   };
 
+  const formatScanDetails = (details?: unknown) => {
+    if (details === undefined || details === null || details === '') {
+      return '';
+    }
+    if (details instanceof Error) {
+      return `: ${details.message}`;
+    }
+    if (typeof details === 'string') {
+      return `: ${details}`;
+    }
+    try {
+      return `: ${JSON.stringify(details)}`;
+    } catch {
+      return `: ${String(details)}`;
+    }
+  };
+
+  const addScanLog = (message: string, details?: unknown) => {
+    const line = `[ScanMenu] ${new Date().toLocaleTimeString()} - ${message}${formatScanDetails(details)}`;
+    console.log(line, details ?? '');
+    setScanLogs((prev) => [line, ...prev].slice(0, 12));
+  };
+
+  const addScanError = (message: string, details?: unknown) => {
+    const line = `[ScanMenu] ${new Date().toLocaleTimeString()} - ERROR: ${message}${formatScanDetails(details)}`;
+    console.error(line, details ?? '');
+    setScanLogs((prev) => [line, ...prev].slice(0, 12));
+  };
+
   const pickFromGallery = async () => {
+    console.log('Requesting media library permissions...');
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Gallery access is needed to pick a menu photo.');
       return;
     }
+    console.log('Launching image library...');
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.85,
       allowsEditing: true,
     });
     if (!result.canceled && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      console.log('[ScanMenu] Gallery image selected', {
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        width: asset.width,
+        height: asset.height,
+      });
+      setImageUri(asset.uri);
+      setImageInfo({
+        fileName: asset.fileName ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+        fileSize: asset.fileSize ?? undefined,
+        width: asset.width,
+        height: asset.height,
+      });
       setScanState('idle');
       setErrorMsg('');
+      setScanLogs([]);
     }
   };
 
   const captureWithCamera = async () => {
+    console.log('Requesting camera permissions...');
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Camera access is needed to scan a menu.');
       return;
     }
+    console.log('Launching camera...');
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.85,
       allowsEditing: true,
     });
     if (!result.canceled && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      console.log('[ScanMenu] Camera image captured', {
+        uri: asset.uri,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+        fileSize: asset.fileSize,
+        width: asset.width,
+        height: asset.height,
+      });
+      setImageUri(asset.uri);
+      setImageInfo({
+        fileName: asset.fileName ?? undefined,
+        mimeType: asset.mimeType ?? undefined,
+        fileSize: asset.fileSize ?? undefined,
+        width: asset.width,
+        height: asset.height,
+      });
       setScanState('idle');
       setErrorMsg('');
+      setScanLogs([]);
     }
   };
 
+  const handleUploadPressIn = () => {
+    console.log('[ScanMenu] Upload button touch started', {
+      imageUri,
+      hasImage: Boolean(imageUri),
+      scanState,
+      debugVersion: SCAN_MENU_DEBUG_VERSION,
+    });
+  };
+
+  const handleUploadPress = () => {
+    console.log('[ScanMenu] Upload button pressed', {
+      imageUri,
+      hasImage: Boolean(imageUri),
+      scanState,
+      debugVersion: SCAN_MENU_DEBUG_VERSION,
+    });
+    void uploadScan();
+  };
+
   const uploadScan = async () => {
+    console.log('[ScanMenu] uploadScan function entered', {
+      imageUri,
+      hasImage: Boolean(imageUri),
+      scanState,
+      debugVersion: SCAN_MENU_DEBUG_VERSION,
+    });
+    setScanLogs([]);
+    addScanLog('Starting scan upload', { imageUri, imageInfo, userId, platform: Platform.OS });
     if (!imageUri) {
       Alert.alert('No Image', 'Please capture or select a menu photo first.');
       return;
@@ -197,11 +304,12 @@ const ScanMenuScreen = ({ navigation }: any) => {
           resolvedUserId = String(obj?.user_id ?? obj?.id ?? obj?.userId ?? obj?._id ?? '');
         }
       } catch (e) {
-        console.warn('[ScanMenu] AsyncStorage fallback failed:', e);
+        addScanError('AsyncStorage fallback failed', e);
       }
     }
 
     if (!resolvedUserId || resolvedUserId === 'undefined' || resolvedUserId === '') {
+      addScanError('User ID missing before upload');
       Alert.alert('Session Error', 'Could not find your user ID. Please log out and log in again.');
       return;
     }
@@ -209,24 +317,37 @@ const ScanMenuScreen = ({ navigation }: any) => {
     setScanState('uploading');
     setErrorMsg('');
     try {
+      addScanLog('Preparing form data for upload');
       const formData = new FormData();
       formData.append('user_id', resolvedUserId);
 
-      const filename = imageUri.split('/').pop() ?? 'scan.jpg';
+      const uriFilename = imageUri.split('/').pop() || 'scan.jpg';
+      const filename = imageInfo?.fileName || uriFilename;
       const ext = (/\.([a-zA-Z0-9]+)$/.exec(filename) ?? [])[1] ?? 'jpg';
-      const mimeType = ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+      const mimeType = imageInfo?.mimeType || (ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg');
+      const uploadName = /\.[a-zA-Z0-9]+$/.test(filename) ? filename : `${filename}.${mimeType === 'image/png' ? 'png' : 'jpg'}`;
+
+      if (imageInfo?.fileSize) {
+        addScanLog('Selected image file size', `${(imageInfo.fileSize / (1024 * 1024)).toFixed(2)} MB`);
+      }
+      addScanLog('Selected image dimensions', `${imageInfo?.width ?? '?'} x ${imageInfo?.height ?? '?'}`);
 
       formData.append('scan_photo', {
         uri: Platform.OS === 'android' ? imageUri : imageUri.replace('file://', ''),
-        name: filename,
+        name: uploadName,
         type: mimeType,
       } as any);
-
+      addScanLog('Uploading scan to server', {
+        endpoint: `${BASE_URL}/api/menu-scans`,
+        user_id: resolvedUserId,
+        file: { name: uploadName, type: mimeType, uri: imageUri },
+      });
       const res = await fetch(`${BASE_URL}/api/menu-scans`, {
         method: 'POST',
         body: formData,
       });
 
+      addScanLog('Server response received', { status: res.status, ok: res.ok });
       if (res.ok) {
         const json = await res.json();
         const menuScan = json?.data?.menu_scan ?? json?.menu_scan ?? json?.data;
@@ -256,10 +377,12 @@ const ScanMenuScreen = ({ navigation }: any) => {
         setScanState('success');
       } else {
         const errText = await res.text();
+        addScanError('Server rejected scan upload', { status: res.status, body: errText });
         setErrorMsg(errText || 'Scan upload failed. Please try again.');
         setScanState('error');
       }
     } catch (err: any) {
+      addScanError('Scan upload failed before server response', err);
       setErrorMsg(err.message ?? 'Network error. Please check your connection.');
       setScanState('error');
     }
@@ -267,8 +390,10 @@ const ScanMenuScreen = ({ navigation }: any) => {
 
   const resetScan = () => {
     setImageUri(null);
+    setImageInfo(null);
     setScanState('idle');
     setErrorMsg('');
+    setScanLogs([]);
     setScanResult(null);
   };
 
@@ -482,6 +607,17 @@ const ScanMenuScreen = ({ navigation }: any) => {
               </View>
             )}
 
+            {scanState === 'error' && scanLogs.length > 0 && (
+              <View style={styles.debugCard}>
+                <Text style={styles.debugTitle}>Upload debug log</Text>
+                {scanLogs.map((line, index) => (
+                  <Text key={`${line}-${index}`} style={styles.debugJson}>
+                    {line}
+                  </Text>
+                ))}
+              </View>
+            )}
+
             <View style={styles.actionRow}>
               <TouchableOpacity
                 style={styles.actionBtn}
@@ -514,8 +650,9 @@ const ScanMenuScreen = ({ navigation }: any) => {
                 !imageUri && styles.uploadBtnDisabled,
                 scanState === 'uploading' && styles.uploadBtnDisabled,
               ]}
-              onPress={uploadScan}
-              disabled={!imageUri || scanState === 'uploading'}
+              onPressIn={handleUploadPressIn}
+              onPress={handleUploadPress}
+              disabled={scanState === 'uploading'}
               activeOpacity={0.85}
             >
               {scanState === 'uploading' ? (
