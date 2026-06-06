@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from '../constants';
+import { authenticatedFetch, isAuthenticationRequiredError } from '../services/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -54,7 +55,7 @@ const IngredientScreen = ({ navigation, route }: any) => {
     const sanitized = sanitizeDishName(data.item.item_name);
     setIsLoadingComponent(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/dish/item-component/${sanitized}`);
+      const res = await authenticatedFetch(`${BASE_URL}/api/dish/item-component/${sanitized}`);
       if (res.ok) {
         const json = await res.json();
         const resultData = json?.data ?? json;
@@ -68,6 +69,9 @@ const IngredientScreen = ({ navigation, route }: any) => {
         Alert.alert('Error', errText || 'Failed to fetch component data.');
       }
     } catch (err: any) {
+      if (isAuthenticationRequiredError(err)) {
+        return;
+      }
       Alert.alert('Error', err.message || 'Unable to load component data.');
     } finally {
       setIsLoadingComponent(false);

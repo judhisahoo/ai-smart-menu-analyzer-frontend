@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import { createNavigationContainerRef, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
 import SplashScreen from './src/screens/SplashScreen';
 import LocationPermissionScreen from './src/screens/LocationPermissionScreen';
 import SavingLocationScreen from './src/screens/SavingLocationScreen';
@@ -12,8 +12,9 @@ import UnderdevelopScreen from './src/screens/UnderdevelopScreen';
 import ComponentScreen from './src/screens/ComponentScreen';
 import IngredientScreen from './src/screens/IngredientScreen';
 import SearchDishScreen from './src/screens/SearchDishScreen';
+import { setUnauthorizedHandler } from './src/services/auth';
 
-type RootStackParamList = {
+export type RootStackParamList = {
   Splash: undefined;
   LocationPermission: undefined;
   SavingLocation: undefined;
@@ -27,10 +28,24 @@ type RootStackParamList = {
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 export default function App() {
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (navigationRef.isReady()) {
+        navigationRef.reset({
+          index: 0,
+          routes: [{ name: 'Welcome' }],
+        });
+      }
+    });
+
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
@@ -53,24 +68,3 @@ export default function App() {
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  placeholderContainer: {
-    flex: 1,
-    backgroundColor: '#C8E6FA',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  placeholderTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1A5276',
-    marginBottom: 10,
-  },
-  placeholderSubtitle: {
-    fontSize: 14,
-    color: '#2E86C1',
-    textAlign: 'center',
-  },
-});

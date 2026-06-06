@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BASE_URL } from '../constants';
+import { authenticatedFetch, isAuthenticationRequiredError } from '../services/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -51,7 +52,7 @@ const SearchDishScreen = ({ navigation }: any) => {
     setIsSearching(true);
     setHasSearched(true);
     try {
-      const res = await fetch(`${BASE_URL}/api/dish/item-search`, {
+      const res = await authenticatedFetch(`${BASE_URL}/api/dish/item-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item_title: itemTitle }),
@@ -75,6 +76,9 @@ const SearchDishScreen = ({ navigation }: any) => {
       }
     } catch (err: any) {
       setDishes([]);
+      if (isAuthenticationRequiredError(err)) {
+        return;
+      }
       Alert.alert('Network Error', err.message || 'Please check your connection.');
     } finally {
       setIsSearching(false);
@@ -85,7 +89,7 @@ const SearchDishScreen = ({ navigation }: any) => {
     const sanitized = sanitizeDishName(dishName);
     setLoadingDetail({ type: 'component', dishName });
     try {
-      const res = await fetch(`${BASE_URL}/api/dish/item-component/${sanitized}`);
+      const res = await authenticatedFetch(`${BASE_URL}/api/dish/item-component/${sanitized}`);
       if (res.ok) {
         const json = await res.json();
         const resultData = json?.data ?? json;
@@ -99,6 +103,9 @@ const SearchDishScreen = ({ navigation }: any) => {
         Alert.alert('Error', errText || 'Failed to fetch component data.');
       }
     } catch (err: any) {
+      if (isAuthenticationRequiredError(err)) {
+        return;
+      }
       Alert.alert('Error', err.message || 'Unable to load component data.');
     } finally {
       setLoadingDetail(null);
@@ -109,7 +116,7 @@ const SearchDishScreen = ({ navigation }: any) => {
     const sanitized = sanitizeDishName(dishName);
     setLoadingDetail({ type: 'ingredient', dishName });
     try {
-      const res = await fetch(`${BASE_URL}/api/dish/item-ingredient/${sanitized}`);
+      const res = await authenticatedFetch(`${BASE_URL}/api/dish/item-ingredient/${sanitized}`);
       if (res.ok) {
         const json = await res.json();
         const resultData = json?.data ?? json;
@@ -123,6 +130,9 @@ const SearchDishScreen = ({ navigation }: any) => {
         Alert.alert('Error', errText || 'Failed to fetch ingredient data.');
       }
     } catch (err: any) {
+      if (isAuthenticationRequiredError(err)) {
+        return;
+      }
       Alert.alert('Error', err.message || 'Unable to load ingredient data.');
     } finally {
       setLoadingDetail(null);
