@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { clearSession } from '../services/auth';
 
 const { width } = Dimensions.get('window');
 
@@ -72,7 +73,7 @@ const MainScreen = ({ navigation }: any) => {
         text: 'Logout',
         style: 'destructive',
         onPress: async () => {
-          await AsyncStorage.multiRemove(['user', 'deviceEmail']);
+          await Promise.all([clearSession(), AsyncStorage.removeItem('deviceEmail')]);
           navigation.replace('Welcome');
         },
       },

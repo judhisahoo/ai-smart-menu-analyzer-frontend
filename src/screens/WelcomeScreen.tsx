@@ -17,13 +17,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Application from 'expo-application';
 import { BASE_URL } from '../constants';
+import {
+  ACCESS_TOKEN_STORAGE_KEY,
+  authenticatedFetch,
+  clearSession,
+  isAuthenticationRequiredError,
+  storeAccessToken,
+} from '../services/auth';
 
 const { width } = Dimensions.get('window');
 
 const WelcomeScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
-  const [userId, setUserId] = useState('');
   const [otp, setOtp] = useState('');
   const [sentOtp, setSentOtp] = useState('');
   const [showOtpInput, setShowOtpInput] = useState(false);
@@ -50,36 +56,36 @@ const WelcomeScreen = ({ navigation }: any) => {
 
     const loadSavedUser = async () => {
       try {
-        const userRaw = await AsyncStorage.getItem('user');
+        const [userRaw, accessToken] = await Promise.all([
+          AsyncStorage.getItem('user'),
+          AsyncStorage.getItem(ACCESS_TOKEN_STORAGE_KEY),
+        ]);
 
-        if (userRaw) {
+        if (userRaw && accessToken) {
           const userObj = JSON.parse(userRaw);
-          const storedUserId: string = userObj?.user_id ?? userObj?.id ?? '';
           const storedEmail: string = userObj?.email ?? '';
 
           if (storedEmail) {
             setEmail(storedEmail);
           }
 
-          if (storedUserId) {
-            setUserId(storedUserId);
-          }
-
           const locationRaw = await AsyncStorage.getItem('userLocation');
           const location = locationRaw ? JSON.parse(locationRaw) : null;
 
           try {
-            await fetch(`${BASE_URL}/api/user/current-location`, {
+            await authenticatedFetch(`${BASE_URL}/api/user/current-location`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                user_id: storedUserId,
                 latitude: location?.latitude ?? null,
                 longitude: location?.longitude ?? null,
                 accuracy: location?.accuracy ?? null,
               }),
             });
-          } catch {
+          } catch (error) {
+            if (isAuthenticationRequiredError(error)) {
+              return;
+            }
             // Non-blocking.
           }
 
@@ -92,7 +98,7 @@ const WelcomeScreen = ({ navigation }: any) => {
           setEmail(savedEmail);
         }
       } catch {
-        await AsyncStorage.removeItem('user');
+        await clearSession();
       } finally {
         setCheckingSavedUser(false);
       }
@@ -194,7 +200,22 @@ const WelcomeScreen = ({ navigation }: any) => {
 
       if (res.ok) {
         const user = await res.json();
-        await AsyncStorage.setItem('user', JSON.stringify(user));
+        const accessToken = user?.access_token ?? user?.data?.access_token;
+
+        if (typeof accessToken !== 'string' || !accessToken.trim()) {
+          Alert.alert('Error', 'Registration succeeded without an access token. Please try again.');
+          return;
+        }
+
+        const profileWithPossibleToken = user?.data?.user ?? user?.user ?? user?.data ?? user;
+        const userProfile =
+          profileWithPossibleToken && typeof profileWithPossibleToken === 'object'
+            ? { ...profileWithPossibleToken }
+            : { name: name.trim(), email };
+        delete userProfile.access_token;
+
+        await storeAccessToken(accessToken);
+        await AsyncStorage.setItem('user', JSON.stringify(userProfile));
         await AsyncStorage.setItem('deviceEmail', email);
         navigation.replace('Main');
       } else {

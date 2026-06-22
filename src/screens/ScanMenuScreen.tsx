@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { BASE_URL } from '../constants';
+import { authenticatedFetch, isAuthenticationRequiredError } from '../services/auth';
 
 const { width } = Dimensions.get('window');
 const ITEMS_PER_PAGE = 10;
@@ -45,8 +46,6 @@ type SelectedImageInfo = {
 };
 
 const ScanMenuScreen = ({ navigation }: any) => {
-  const [userId, setUserId] = useState<string>('');
-  const [rawUser, setRawUser] = useState<string>('Not loaded yet...');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageInfo, setImageInfo] = useState<SelectedImageInfo | null>(null);
   const [scanState, setScanState] = useState<ScanState>('idle');
@@ -76,23 +75,6 @@ const ScanMenuScreen = ({ navigation }: any) => {
       useNativeDriver: true,
     }).start();
 
-    const loadUser = async () => {
-      try {
-        const raw = await AsyncStorage.getItem('user');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const obj = parsed?.data ?? parsed;
-          setRawUser(JSON.stringify(obj, null, 2));
-          const id = String(obj?.user_id ?? obj?.id ?? obj?.userId ?? obj?._id ?? '');
-          setUserId(id);
-        } else {
-          setRawUser('⚠️ No "user" key found in AsyncStorage');
-        }
-      } catch (e) {
-        setRawUser('❌ Error reading user: ' + String(e));
-      }
-    };
-
     const loadCachedDishes = async () => {
       try {
         const raw = await AsyncStorage.getItem(DISHES_STORAGE_KEY);
@@ -108,7 +90,6 @@ const ScanMenuScreen = ({ navigation }: any) => {
       }
     };
 
-    loadUser();
     loadCachedDishes();
 
     const pulse = Animated.loop(
@@ -288,29 +269,9 @@ const ScanMenuScreen = ({ navigation }: any) => {
       debugVersion: SCAN_MENU_DEBUG_VERSION,
     });
     setScanLogs([]);
-    addScanLog('Starting scan upload', { imageUri, imageInfo, userId, platform: Platform.OS });
+    addScanLog('Starting scan upload', { imageUri, imageInfo, platform: Platform.OS });
     if (!imageUri) {
       Alert.alert('No Image', 'Please capture or select a menu photo first.');
-      return;
-    }
-
-    let resolvedUserId = userId;
-    if (!resolvedUserId) {
-      try {
-        const raw = await AsyncStorage.getItem('user');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          const obj = parsed?.data ?? parsed;
-          resolvedUserId = String(obj?.user_id ?? obj?.id ?? obj?.userId ?? obj?._id ?? '');
-        }
-      } catch (e) {
-        addScanError('AsyncStorage fallback failed', e);
-      }
-    }
-
-    if (!resolvedUserId || resolvedUserId === 'undefined' || resolvedUserId === '') {
-      addScanError('User ID missing before upload');
-      Alert.alert('Session Error', 'Could not find your user ID. Please log out and log in again.');
       return;
     }
 
@@ -319,7 +280,6 @@ const ScanMenuScreen = ({ navigation }: any) => {
     try {
       addScanLog('Preparing form data for upload');
       const formData = new FormData();
-      formData.append('user_id', resolvedUserId);
 
       const uriFilename = imageUri.split('/').pop() || 'scan.jpg';
       const filename = imageInfo?.fileName || uriFilename;
@@ -339,10 +299,9 @@ const ScanMenuScreen = ({ navigation }: any) => {
       } as any);
       addScanLog('Uploading scan to server', {
         endpoint: `${BASE_URL}/api/menu-scans`,
-        user_id: resolvedUserId,
         file: { name: uploadName, type: mimeType, uri: imageUri },
       });
-      const res = await fetch(`${BASE_URL}/api/menu-scans`, {
+      const res = await authenticatedFetch(`${BASE_URL}/api/menu-scans`, {
         method: 'POST',
         body: formData,
       });
@@ -382,6 +341,9 @@ const ScanMenuScreen = ({ navigation }: any) => {
         setScanState('error');
       }
     } catch (err: any) {
+      if (isAuthenticationRequiredError(err)) {
+        return;
+      }
       addScanError('Scan upload failed before server response', err);
       setErrorMsg(err.message ?? 'Network error. Please check your connection.');
       setScanState('error');
@@ -405,7 +367,7 @@ const ScanMenuScreen = ({ navigation }: any) => {
     const sanitized = sanitizeDishName(dishName);
     setLoadingDetail({ type: 'component', dishName });
     try {
-      const res = await fetch(`${BASE_URL}/api/dish/item-component/${sanitized}`);
+      const res = await authenticatedFetch(`${BASE_URL}/api/dish/item-component/${sanitized}`);
       if (res.ok) {
         const json = await res.json();
         const resultData = json?.data ?? json;
@@ -419,6 +381,9 @@ const ScanMenuScreen = ({ navigation }: any) => {
         Alert.alert('Error', errText || 'Failed to fetch component data');
       }
     } catch (err: any) {
+      if (isAuthenticationRequiredError(err)) {
+        return;
+      }
       Alert.alert('Error', err.message);
     } finally {
       setLoadingDetail(null);
@@ -429,7 +394,7 @@ const ScanMenuScreen = ({ navigation }: any) => {
     const sanitized = sanitizeDishName(dishName);
     setLoadingDetail({ type: 'ingredient', dishName });
     try {
-      const res = await fetch(`${BASE_URL}/api/dish/item-ingredient/${sanitized}`);
+      const res = await authenticatedFetch(`${BASE_URL}/api/dish/item-ingredient/${sanitized}`);
       if (res.ok) {
         const json = await res.json();
         const resultData = json?.data ?? json;
@@ -443,6 +408,9 @@ const ScanMenuScreen = ({ navigation }: any) => {
         Alert.alert('Error', errText || 'Failed to fetch ingredient data');
       }
     } catch (err: any) {
+      if (isAuthenticationRequiredError(err)) {
+        return;
+      }
       Alert.alert('Error', err.message);
     } finally {
       setLoadingDetail(null);
